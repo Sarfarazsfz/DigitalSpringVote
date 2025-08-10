@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SpringVote - Voting System (Demo)</title>
+  <style>
+    :root {
+    --color1: #845ec2;
+    --color2: #f3c5ff;
+    --color3: #00c9a7;
+    --color4: #fefedf;
+    --color5: black;
+  }
+    * { box-sizing: border-box;
+      font-family: Arial, sans-serif;
+      transition: all 0.18s ease;
+    }
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, var(--color2), var(--color4));
+      color: #333;
+    }
+    header {
+      background: linear-gradient(90deg, var(--color1), var(--color3));
+      padding: 20px;
+      text-align: center;
+      color: #fff;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+    }
+    h1 { margin: 0; font-size: 48px;
+    }
+    nav { background: var(--color3);
+      padding: 12px; text-align: center;
+    }
+    nav a {
+      color: #fff;
+      text-decoration: none;
+      margin: 0 15px;
+      font-weight: bold;
+      padding: 6px 10px;
+      border-radius: 8px;
+    }
+    nav a:hover {
+      background: var(--color1);
+    }
+    .container { max-width: 900px;
+      margin: 24px auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0px 8px 10px black;
+    }
+    .container:hover{
+      box-shadow: 0 20px 30px black;
+    }
+    .row { display:flex;
+      gap:12px; flex-wrap:wrap;
+    }
+    input, select, button {
+      padding: 10px;
+      margin: 5px 0;
+      border: 2px solid var(--color3);
+      border-radius: 8px;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--color1);
+      box-shadow: 0 0 8px rgba(0,0,0,0.05);
+    }
+    button {
+      background: var(--color3);
+      border: none;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 18px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: var(--color1);
+      transform: scale(1.02);
+      button:hover{
+        box-shadow: 0 4px 8px goldenrod;
+      }
+    }
+    .candidate {
+      margin: 12px 0;
+      padding: 16px;
+      border-radius: 8px;
+      width: 160px;
+      min-height:100px;
+      background: var(--color2);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      font-weight:bold;
+    }
+    #voteList {
+      display:flex;
+      gap:20px;
+      flex-wrap:wrap;
+      margin-top: 10px;
+    }
+    .small {
+      font-size: 13px;
+      color:#444;
+    }
+    footer {
+      text-align:center;
+      padding:10px;
+      background:var(--color1);
+      color:#fff;
+      margin-top:20px;
+    }
+    .hidden {
+      display:none !important;
+    }
+    .countdown { font-weight:700; color:var(--color3);
+    }
+    video, canvas {
+      border-radius:8px;
+      max-width: 100%;
+    }
+  </style>
+  <!-- NOTE: face-api.js and its models are used here for demo only. Real Aadhaar biometric authentication must use authorized government APIs and follow law. -->
+  <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>SpringVote</h1>
+    <p>Blockchain Voting Demo — **DEMO ONLY**</p>
+  </header>
+  <nav>
+    <a href="#" onclick="showSection('create')">Create Election</a>
+    <a href="#" onclick="showSection('vote')">Vote</a>
+  </nav>
+
+  <div class="container" id="createSection">
+    <h2>Create Election</h2>
+    <div class="row">
+      <input type="text" id="electionName" placeholder="Election Name">
+      <select id="durationSelect">
+        <option value="24">24 hours</option>
+        <option value="48">48 hours (2 days)</option>
+      </select>
+      <input type="datetime-local" id="startAt"> <!-- optional specific start time -->
+      <button onclick="addCandidate()">Add Candidate</button>
+    </div>
+
+    <input type="text" id="candidateName" placeholder="Candidate Name">
+    <div id="candidateList" class="row"></div>
+    <div style="margin-top:12px">
+      <button onclick="startElection()">Start Election</button>
+      <span class="small" style="margin-left:12px;">When started, the election will run for the chosen duration. A countdown will appear in the Vote section.</span>
+    </div>
+  </div>
+
+  <div class="container hidden" id="voteSection">
+    <h2>Vote</h2>
+    <div class="row" style="align-items:center;">
+      <div>
+        <div><strong>Election:</strong> <span id="currentElectionName"></span></div>
+        <div>Ends at: <span id="endTimeText"></span></div>
+        <div>Time left: <span id="countdown" class="countdown">--:--:--</span></div>
+      </div>
+      <div style="margin-left:auto; text-align:right;">
+        <div id="electionStatus" class="small"></div>
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="row">
+      <input type="text" id="aadhaar" placeholder="Enter 12-digit Aadhaar Number">
+      <input type="number" id="age" placeholder="Enter Your Age" min="0">
+    </div>
+
+    <div style="margin-top:8px;" class="small">You must provide a selfie and a copy/photo of your Aadhaar for biometric match (demo). Real production must use UIDAI-authorized APIs.</div>
+
+    <div class="row" style="margin-top:12px; gap:24px;">
+      <div>
+        <div><strong>Take Selfie</strong></div>
+        <video id="video" width="320" height="240" autoplay muted></video>
+        <div style="margin-top:6px;"><button id="captureBtn">Capture Selfie</button></div>
+        <canvas id="selfieCanvas" width="320" height="240" class="hidden"></canvas>
+      </div>
+
+      <div>
+        <div><strong>Upload Aadhaar Photo (demo)</strong></div>
+        <input type="file" id="aadhaarPhoto" accept="image/*">
+        <canvas id="aadhaarCanvas" width="320" height="240" class="hidden"></canvas>
+      </div>
+
+      <div style="align-self:flex-end;">
+        <div class="small">After capture/upload, click <strong>Verify & Vote</strong> on your chosen candidate.</div>
+      </div>
+    </div>
+
+    <div id="voteList"></div>
+  </div>
+
+  <footer>
+    &copy; 2025 SpringVote Project — Demo
+  </footer>
+
+  <script>
+    // ---------- Data (demo only) ----------
+    let candidates = [];
+    let election = { name: null, endTime: null, started:false };
+    let countdownTimer = null;
+
+    function showSection(id) {
+      document.getElementById('createSection').classList.toggle('hidden', id !== 'create');
+      document.getElementById('voteSection').classList.toggle('hidden', id !== 'vote');
+      if (id === 'vote') updateVoteUI();
+    }
+
+    function addCandidate() {
+      const name = document.getElementById('candidateName').value.trim();
+      if (name) { candidates.push({ name, votes: 0 }); document.getElementById('candidateName').value=''; renderCandidates(); }
+    }
+
+    function renderCandidates() {
+      const list = document.getElementById('candidateList');
+      list.innerHTML = candidates.map((c,i)=>`<div class='candidate'>${c.name}</div>`).join('');
+    }
+
+    function startElection() {
+      const ename = document.getElementById('electionName').value.trim() || 'Untitled Election';
+      const durationHours = parseInt(document.getElementById('durationSelect').value,10) || 24;
+      const startAtInput = document.getElementById('startAt').value;
+      const now = new Date();
+      let startAt = startAtInput ? new Date(startAtInput) : now;
+      if (startAt < now) startAt = now; // don't allow past start in demo
+
+      election.name = ename;
+      election.started = true;
+      election.startTime = startAt;
+      election.endTime = new Date(startAt.getTime() + durationHours * 60 * 60 * 1000);
+
+      // populate vote UI
+      const list = document.getElementById('voteList');
+      list.innerHTML = candidates.map((c, i) => `
+        <div class='candidate'>
+          <div>${c.name}</div>
+          <div style='margin-top:8px'><button onclick='attemptVote(${i})' id='voteBtn${i}'>Verify & Vote</button></div>
+          <div class='small' id='cv${i}'>Votes: ${c.votes}</div>
+        </div>
+      `).join('');
+
+      document.getElementById('currentElectionName').innerText = election.name;
+      document.getElementById('endTimeText').innerText = election.endTime.toLocaleString();
+      showSection('vote');
+      startCountdown();
+    }
+
+    function startCountdown(){
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = setInterval(()=>{
+        const now = new Date();
+        const diff = election.endTime - now;
+        const status = document.getElementById('electionStatus');
+        if (diff <= 0) {
+          document.getElementById('countdown').innerText = '00:00:00';
+          status.innerText = 'Election ended.';
+          disableVoting();
+          clearInterval(countdownTimer);
+          return;
+        }
+        const hrs = Math.floor(diff / (1000*60*60));
+        const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+        const secs = Math.floor((diff % (1000*60)) / 1000);
+        document.getElementById('countdown').innerText = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        status.innerText = 'Election active';
+      }, 500);
+    }
+
+    function disableVoting(){
+      candidates.forEach((_,i)=>{ const btn = document.getElementById('voteBtn'+i); if(btn) btn.disabled=true; });
+    }
+
+    // ---------- Aadhaar & face verification (DEMO) ----------
+    // IMPORTANT: This is a client-side DEMO only. Real Aadhaar authentication must be done via UIDAI-authorized backend APIs and strict legal compliance.
+
+    // Webcam setup
+    const video = document.getElementById('video');
+    const selfieCanvas = document.getElementById('selfieCanvas');
+    const aadhaarCanvas = document.getElementById('aadhaarCanvas');
+    const selfieCtx = selfieCanvas.getContext('2d');
+    const aadhaarCtx = aadhaarCanvas.getContext('2d');
+
+    async function setupCamera(){
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        video.srcObject = stream;
+      } catch(e) { console.warn('Camera not available', e); }
+    }
+    setupCamera();
+
+    // Load face-api models (user must host /models or change path). For quick demo we attempt CDN-hosted models if configured.
+    let modelsLoaded = false;
+    (async function loadModels(){
+      const MODEL_URL = '/models' // In production host these on your server or change to CDN path where models are served.
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        modelsLoaded = true;
+        console.log('face-api models loaded (demo)');
+      } catch(e){
+        console.warn('Could not load face-api models from', MODEL_URL, '. For demo you can still capture images (no face-match).', e);
+      }
+    })();
+
+    document.getElementById('captureBtn').addEventListener('click', ()=>{
+      selfieCtx.drawImage(video, 0, 0, selfieCanvas.width, selfieCanvas.height);
+      selfieCanvas.classList.remove('hidden');
+    });
+
+    document.getElementById('aadhaarPhoto').addEventListener('change', (ev)=>{
+      const f = ev.target.files[0];
+      if (!f) return;
+      const img = new Image();
+      const url = URL.createObjectURL(f);
+      img.onload = ()=>{ aadhaarCtx.clearRect(0,0, aadhaarCanvas.width, aadhaarCanvas.height); aadhaarCtx.drawImage(img, 0, 0, aadhaarCanvas.width, aadhaarCanvas.height); aadhaarCanvas.classList.remove('hidden'); URL.revokeObjectURL(url); }
+      img.src = url;
+    });
+
+    async function attemptVote(index){
+      // basic client validations
+      const aadhaar = document.getElementById('aadhaar').value.trim();
+      const age = parseInt(document.getElementById('age').value,10);
+      if (!/^\d{12}$/.test(aadhaar)) { alert('Invalid Aadhaar number — must be 12 digits'); return; }
+      if (isNaN(age) || age < 18){ alert('You must be 18+ to vote'); return; }
+      if (!election.started || new Date() > election.endTime){ alert('Election is not active'); return; }
+
+      // DEMO face-match
+      let faceMatch = false;
+      if (modelsLoaded && !selfieCanvas.classList.contains('hidden') && !aadhaarCanvas.classList.contains('hidden')){
+        try {
+          const options = new faceapi.TinyFaceDetectorOptions();
+          const sImg = await faceapi.detectSingleFace(selfieCanvas, options).withFaceLandmarks().withFaceDescriptor();
+          const aImg = await faceapi.detectSingleFace(aadhaarCanvas, options).withFaceLandmarks().withFaceDescriptor();
+          if (sImg && aImg){
+            const dist = faceapi.euclideanDistance(sImg.descriptor, aImg.descriptor);
+            console.log('descriptor distance', dist);
+            // threshold is heuristic; for demo use 0.6
+            faceMatch = dist < 0.6;
+          } else {
+            alert('Could not detect face in one of the images (demo).');
+            return;
+          }
+        } catch(e){ console.error('Face matching failed', e); alert('Face matching failed (demo).'); return; }
+      } else {
+        // if models not loaded, allow user to proceed for demo only
+        const ok = confirm('Face-match models not loaded or images missing. Proceed in DEMO mode without real match?');
+        if (!ok) return;
+        faceMatch = true; // demo bypass
+      }
+
+      if (!faceMatch){ alert('Face does not match Aadhaar photo (demo).'); return; }
+
+      // At this point, client demo says verification OK.
+      // REAL apps must now call backend endpoints that:
+      //  1) verify Aadhaar via UIDAI Aadhaar Authentication APIs (OTP/biometric) OR e-KYC with explicit consent
+      //  2) ensure voter hasn't voted before (secure server-side check), and store vote immutably (eg. blockchain or append-only DB).
+      // For the demo we increment locally and update UI.
+
+      candidates[index].votes++;
+      document.getElementById('cv'+index).innerText = 'Votes: ' + candidates[index].votes;
+      alert('Vote recorded (DEMO) for ' + candidates[index].name);
+
+      // disable future voting for this Aadhaar in demo (client-side only)
+      try {
+        const votedKey = 'voted_' + aadhaar; // DO NOT do this in production. Use server-side checks and hashing.
+        localStorage.setItem(votedKey, '1');
+      } catch(e){ }
+    }
+
+    function updateVoteUI(){
+      document.getElementById('currentElectionName').innerText = election.name || 'No active election';
+      document.getElementById('endTimeText').innerText = election.endTime ? election.endTime.toLocaleString() : '--';
+      // render candidates inside voteList if not already
+      if (!document.getElementById('voteList').innerHTML.trim()){
+        document.getElementById('voteList').innerHTML = candidates.map((c, i) => `
+          <div class='candidate'>
+            <div>${c.name}</div>
+            <div style='margin-top:8px'><button onclick='attemptVote(${i})' id='voteBtn${i}'>Verify & Vote</button></div>
+            <div class='small' id='cv${i}'>Votes: ${c.votes}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Accessibility: stop camera on unload
+    window.addEventListener('beforeunload', ()=>{ if (video.srcObject) video.srcObject.getTracks().forEach(t=>t.stop()); });
+  </script>
+</body>
+</html>
